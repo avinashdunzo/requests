@@ -8,10 +8,12 @@ from .exceptions import ApiCircuitBreakerError, CustomHttpCircuitBreakerError
 
 class CircuitBreakerConfig(object):
 
-    def __init__(self, fail_max_to_open, sleep_time_to_half_open, http_failed_status_code_list):
+    def __init__(self, fail_max_to_open, sleep_time_to_half_open, http_failed_status_code_list,
+                 http_method_keyword_params):
         self.fail_max_to_open = fail_max_to_open
         self.sleep_time_to_half_open = sleep_time_to_half_open
         self.http_failed_status_code_list = http_failed_status_code_list or []
+        self.http_method_keyword_params = http_method_keyword_params or []
 
     @staticmethod
     def from_json(json_data):
@@ -22,9 +24,13 @@ class CircuitBreakerConfig(object):
                     if config["domain_name"] in configs:
                         warnings.warn(
                             "Config already present once overriding :" + config["domain_name"])
+                    http_method_keyword_params = config.get("http_method_keyword_params") or []
+                    http_method_keyword_params = list(filter(lambda x: (x.get('keyword') and x.get('method')),
+                                                             http_method_keyword_params))
                     configs[config["domain_name"]] = CircuitBreakerConfig(config["fail_max_to_open"],
                                                                           config["sleep_time_to_half_open"],
-                                                                          config["http_failed_status_code_list"])
+                                                                          config["http_failed_status_code_list"],
+                                                                          http_method_keyword_params)
                 except:
                     warnings.warn("JSON File has wrong format circuit breaker functionality wont be used :" + config)
         except:
@@ -54,28 +60,52 @@ class CircuitBreaker(object):
 
     def __register_circuit_breaker(self):
 
-        for key, config in self.__circuit_breaker_config_per_domain.iteritems():
-            self.__circuit_breaker_factory_per_domain[key] = pybreaker.CircuitBreaker(
-                fail_max=config.fail_max_to_open,
-                reset_timeout=config.sleep_time_to_half_open,
-                state_storage=pybreaker.CircuitMemoryStorage(pybreaker.STATE_CLOSED))
+        try:
+            for key, config in self.__circuit_breaker_config_per_domain.iteritems():
 
-    def __get_circuit_breaker_by_url(self, url):
+                if not config.http_method_keyword_params:
+                    self.__circuit_breaker_factory_per_domain[key] = pybreaker.CircuitBreaker(
+                        fail_max=config.fail_max_to_open,
+                        reset_timeout=config.sleep_time_to_half_open,
+                        state_storage=pybreaker.CircuitMemoryStorage(pybreaker.STATE_CLOSED))
+                else:
+                    for param in config.http_method_keyword_params:
+                        k = CircuitBreaker.__get_domain_key(key, param)
+                        self.__circuit_breaker_factory_per_domain[k] = pybreaker.CircuitBreaker(
+                            fail_max=config.fail_max_to_open,
+                            reset_timeout=config.sleep_time_to_half_open,
+                            state_storage=pybreaker.CircuitMemoryStorage(pybreaker.STATE_CLOSED))
+        except:
+            pass
+
+    @staticmethod
+    def __get_domain_key(domain_name, param):
+        return "{}_{}_{}".format(domain_name, param["keyword"], param["method"])
+
+    def __get_circuit_breaker_by_url(self, url, method):
         try:
             _, domain_name, _ = get_host(url)
             cfg = self.__circuit_breaker_config_per_domain.get(domain_name)
+
+            for param in cfg.http_method_keyword_params:
+                if param["keyword"] in url and param["method"] == method:
+                    cb = self.__circuit_breaker_config_per_domain.get(CircuitBreaker.__get_domain_key(domain_name, param))
+                    if cb:
+                        return cb, cfg.http_failed_status_code_list
+
             return self.__circuit_breaker_factory_per_domain.get(domain_name), cfg.http_failed_status_code_list
+
         except:
             return None
 
     def execute_with_circuit_breaker(self, func, method, url, **kwargs):
 
-        cb, status_code_list = self.__get_circuit_breaker_by_url(url)
+        cb, status_code_list = self.__get_circuit_breaker_by_url(url, method)
         if not cb:
             return False, None
 
         try:
-            return True, cb.call(CircuitBreaker.basic_request_cb, status_code_list, func, method, url, kwargs)
+            return True, cb.call(CircuitBreaker.basic_request_cb, status_code_list, func, method, url, **kwargs)
         except pybreaker.CircuitBreakerError:
             raise ApiCircuitBreakerError(
                 "Requests are closed because of too many failures".format(url)
