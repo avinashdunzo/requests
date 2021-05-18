@@ -56,7 +56,7 @@ def request(method, url, **kwargs):
     # avoid leaving sockets open which can trigger a ResourceWarning in some
     # cases, and look like a memory leak in others.
 
-    executed, response = default_circuit_breaker.execute_with_circuit_breaker(basic_request, method, url, kwargs)
+    executed, response = default_circuit_breaker.execute_with_circuit_breaker(basic_request, method, url, **kwargs)
     if executed:
         return response
 

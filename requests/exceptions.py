@@ -108,6 +108,13 @@ class UnrewindableBodyError(RequestException):
 class ApiCircuitBreakerError(RequestException):
     """Requests encountered as circuit was open """
 
+
+class CustomHttpCircuitBreakerError(Exception):
+    """Failure in http status codes """
+    def __init__(self, http_response):
+        super(CustomHttpCircuitBreakerError, self).__init__()
+        self.http_response = http_response
+
 # Warnings
 
 
