@@ -87,16 +87,19 @@ class CircuitBreaker(object):
             _, domain_name, _ = get_host(url)
             cfg = self.__circuit_breaker_config_per_domain.get(domain_name)
 
+            if not cfg.http_method_keyword_params:
+                return self.__circuit_breaker_factory_per_domain.get(domain_name), cfg.http_failed_status_code_list
+
             for param in cfg.http_method_keyword_params:
                 if param["keyword"] in url and param["method"] == method:
                     cb = self.__circuit_breaker_config_per_domain.get(CircuitBreaker.__get_domain_key(domain_name, param))
                     if cb:
                         return cb, cfg.http_failed_status_code_list
 
-            return self.__circuit_breaker_factory_per_domain.get(domain_name), cfg.http_failed_status_code_list
-
         except:
-            return None
+            pass
+
+        return None, None
 
     def execute_with_circuit_breaker(self, func, method, url, **kwargs):
 
