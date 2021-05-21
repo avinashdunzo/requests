@@ -4,6 +4,21 @@ import json
 import warnings
 from urllib3.util.url import get_host
 from .exceptions import ApiCircuitBreakerError, CustomHttpCircuitBreakerError
+import newrelic.agent
+
+
+class MonitorListener(pybreaker.CircuitBreakerListener):
+    def before_call(self, cb, func, *args, **kwargs):
+        try:
+            value = 1
+            if cb.current_state == pybreaker.STATE_OPEN:
+                value = 3
+            elif cb.current_state == pybreaker.STATE_HALF_OPEN:
+                value = 2
+
+            newrelic.agent.record_custom_metric("Custom/circuit_breaker_{}".format(cb.name), value)
+        except:
+            pass
 
 
 class CircuitBreakerConfig(object):
@@ -67,14 +82,16 @@ class CircuitBreaker(object):
                     self.__circuit_breaker_factory_per_domain[key] = pybreaker.CircuitBreaker(
                         fail_max=config.fail_max_to_open,
                         reset_timeout=config.sleep_time_to_half_open,
-                        state_storage=pybreaker.CircuitMemoryStorage(pybreaker.STATE_CLOSED))
+                        state_storage=pybreaker.CircuitMemoryStorage(pybreaker.STATE_CLOSED), name=key,
+                        listeners=[MonitorListener()])
                 else:
                     for param in config.http_method_keyword_params:
                         k = CircuitBreaker.__get_domain_key(key, param)
                         self.__circuit_breaker_factory_per_domain[k] = pybreaker.CircuitBreaker(
                             fail_max=config.fail_max_to_open,
                             reset_timeout=config.sleep_time_to_half_open,
-                            state_storage=pybreaker.CircuitMemoryStorage(pybreaker.STATE_CLOSED))
+                            state_storage=pybreaker.CircuitMemoryStorage(pybreaker.STATE_CLOSED), name=k,
+                            listeners=[MonitorListener()])
         except:
             pass
 
