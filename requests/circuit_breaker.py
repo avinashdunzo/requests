@@ -115,7 +115,8 @@ class CircuitBreaker(object):
                     if cb:
                         return cb, cfg.http_failed_status_code_list
 
-        except:
+        except Exception as e:
+            warnings.warn("error while getting url: {}".format(e.message))
             pass
 
         return None, None
