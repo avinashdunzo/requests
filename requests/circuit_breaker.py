@@ -103,7 +103,7 @@ class CircuitBreaker(object):
         try:
             _, domain_name, port = get_host(url)
             if port not in [80, 443]:
-                domain_name = domain_name + ":" + port
+                domain_name = ":".format(domain_name, port)
             cfg = self.__circuit_breaker_config_per_domain.get(domain_name)
 
             if not cfg.http_method_keyword_params:
