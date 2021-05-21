@@ -101,7 +101,9 @@ class CircuitBreaker(object):
 
     def __get_circuit_breaker_by_url(self, url, method):
         try:
-            _, domain_name, _ = get_host(url)
+            _, domain_name, port = get_host(url)
+            if port not in [80, 443]:
+                domain_name = domain_name + ":" + port
             cfg = self.__circuit_breaker_config_per_domain.get(domain_name)
 
             if not cfg.http_method_keyword_params:
