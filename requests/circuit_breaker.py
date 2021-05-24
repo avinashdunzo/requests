@@ -5,6 +5,7 @@ import warnings
 from urllib3.util.url import get_host
 from .exceptions import ApiCircuitBreakerError, CustomHttpCircuitBreakerError
 import newrelic.agent
+import socket
 
 
 class MonitorListener(pybreaker.CircuitBreakerListener):
@@ -16,9 +17,16 @@ class MonitorListener(pybreaker.CircuitBreakerListener):
             elif cb.current_state == pybreaker.STATE_HALF_OPEN:
                 value = 2
 
+            ip = None
+            try:
+                ip = socket.gethostbyname(socket.gethostname())
+            except:
+                pass
+
             newrelic.agent.record_custom_event("circuit_breaker_event", {
                 "name": cb.name,
                 "service_name": newrelic.core.config.global_settings().app_name,
+                "instance_ip": ip,
                 "value": value,
             }, newrelic.agent.application())
         except:
