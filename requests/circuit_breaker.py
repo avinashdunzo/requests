@@ -9,6 +9,17 @@ import socket
 
 
 class MonitorListener(pybreaker.CircuitBreakerListener):
+
+    def __init__(self):
+        self.ip = None
+        self.app_name = None
+        try:
+            self.ip = socket.gethostbyname(socket.gethostname())
+            self.app_name = newrelic.core.config.global_settings().app_name
+        except:
+            pass
+
+
     def before_call(self, cb, func, *args, **kwargs):
         try:
             value = 1
@@ -17,16 +28,10 @@ class MonitorListener(pybreaker.CircuitBreakerListener):
             elif cb.current_state == pybreaker.STATE_HALF_OPEN:
                 value = 2
 
-            ip = None
-            try:
-                ip = socket.gethostbyname(socket.gethostname())
-            except:
-                pass
-
             newrelic.agent.record_custom_event("circuit_breaker_event", {
                 "name": cb.name,
-                "service_name": newrelic.core.config.global_settings().app_name,
-                "instance_ip": ip,
+                "service_name": self.app_name,
+                "instance_ip": self.ip,
                 "value": value,
             }, newrelic.agent.application())
         except:
