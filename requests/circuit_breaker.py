@@ -16,7 +16,10 @@ class MonitorListener(pybreaker.CircuitBreakerListener):
             elif cb.current_state == pybreaker.STATE_HALF_OPEN:
                 value = 2
 
-            newrelic.agent.record_custom_metric("Custom/circuit_breaker_{}".format(cb.name), value, newrelic.agent.application())
+            newrelic.agent.record_custom_event("Custom/circuit_breaker", {
+                "name": cb.name,
+                "pod_ip": "test"
+            }, newrelic.agent.application())
         except:
             pass
 
