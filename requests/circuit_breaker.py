@@ -18,7 +18,7 @@ class MonitorListener(pybreaker.CircuitBreakerListener):
 
             newrelic.agent.record_custom_event("circuit_breaker_event", {
                 "name": cb.name,
-                "pod_ip": "test",
+                "service_name": newrelic.core.config.global_settings().app_name,
                 "value": value,
             }, newrelic.agent.application())
         except:
