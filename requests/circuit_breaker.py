@@ -19,20 +19,27 @@ class MonitorListener(pybreaker.CircuitBreakerListener):
         except:
             pass
 
+    def failure(self, cb, exc):
+        self.send_updates(cb, 0, 1)
 
-    def before_call(self, cb, func, *args, **kwargs):
+    def success(self, cb):
+        self.send_updates(cb, 1, 0)
+
+    def state_change(self, cb, old_state, new_state):
+        self.send_updates(cb, 0, 0)
+
+    def send_updates(self, cb, success_count, fail_count):
         try:
-            value = 1
-            if cb.current_state == pybreaker.STATE_OPEN:
-                value = 3
-            elif cb.current_state == pybreaker.STATE_HALF_OPEN:
-                value = 2
+            newrelic.agent.record_custom_event("circuit_breaker_event_espresso", {
 
-            newrelic.agent.record_custom_event("circuit_breaker_event", {
                 "name": cb.name,
                 "service_name": self.app_name,
                 "instance_ip": self.ip,
-                "value": value,
+                "circuit_state": cb.current_state,
+                "success": success_count,
+                "errors": fail_count,
+                "fallback_success": 0,
+                "fallback_failure": 0,
             }, newrelic.agent.application())
         except:
             pass
